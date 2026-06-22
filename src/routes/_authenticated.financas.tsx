@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wallet, Plus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { Wallet, Plus, Trash2, TrendingUp, TrendingDown, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
 
@@ -27,6 +28,11 @@ function Financas() {
   const userId = user!.id;
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [confirmDel, setConfirmDel] = useState<Entry | null>(null);
+  const [filterType, setFilterType] = useState<"todos" | "ganho" | "gasto">("todos");
+  const [filterCat, setFilterCat] = useState<string>("todas");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const { data: entries = [] } = useQuery({
     queryKey: ["finance", userId],
@@ -49,13 +55,30 @@ function Financas() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("finance_entries").delete().eq("id", id); if (error) throw error; },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["finance", userId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["finance", userId] }); toast.success("Lançamento removido"); setConfirmDel(null); },
+    onError: (e: Error) => toast.error(e.message),
   });
+
+  const categories = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of entries) if (e.category) s.add(e.category);
+    return Array.from(s).sort();
+  }, [entries]);
+
+  const filtered = useMemo(() => {
+    return entries.filter((e) => {
+      if (filterType !== "todos" && e.type !== filterType) return false;
+      if (filterCat !== "todas" && e.category !== filterCat) return false;
+      if (fromDate && e.entry_date < fromDate) return false;
+      if (toDate && e.entry_date > toDate) return false;
+      return true;
+    });
+  }, [entries, filterType, filterCat, fromDate, toDate]);
 
   const { ganhos, gastos, saldo, chart } = useMemo(() => {
     let g = 0, p = 0;
     const byMonth: Record<string, { mes: string; ganhos: number; gastos: number }> = {};
-    for (const e of entries) {
+    for (const e of filtered) {
       const v = Number(e.amount);
       if (e.type === "ganho") g += v; else p += v;
       const m = e.entry_date.slice(0, 7);
@@ -63,7 +86,7 @@ function Financas() {
       if (e.type === "ganho") byMonth[m].ganhos += v; else byMonth[m].gastos += v;
     }
     return { ganhos: g, gastos: p, saldo: g - p, chart: Object.values(byMonth).sort((a, b) => a.mes.localeCompare(b.mes)) };
-  }, [entries]);
+  }, [filtered]);
 
   return (
     <div>
@@ -72,7 +95,7 @@ function Financas() {
         description="Controle seus ganhos e gastos."
         action={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" /> Novo lançamento</Button></DialogTrigger>
+            <DialogTrigger asChild><Button size="lg"><Plus className="mr-2 h-4 w-4" /> Novo lançamento</Button></DialogTrigger>
             <EntryDialog onSubmit={(v) => create.mutate(v)} pending={create.isPending} />
           </Dialog>
         }
@@ -93,13 +116,46 @@ function Financas() {
         </div>
       </div>
 
-      {entries.length === 0 ? (
+      {/* Filtros */}
+      <div className="card-surface mt-4 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Filter className="h-4 w-4 text-primary" /> Filtros</div>
+        <div className="grid gap-3 sm:grid-cols-4">
+          <div>
+            <Label className="text-xs">Tipo</Label>
+            <Select value={filterType} onValueChange={(v) => setFilterType(v as "todos" | "ganho" | "gasto")}>
+              <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="ganho">Ganhos</SelectItem>
+                <SelectItem value="gasto">Gastos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Categoria</Label>
+            <Select value={filterCat} onValueChange={setFilterCat}>
+              <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas</SelectItem>
+                {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div><Label className="text-xs">De</Label><Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></div>
+          <div><Label className="text-xs">Até</Label><Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></div>
+        </div>
+        {(filterType !== "todos" || filterCat !== "todas" || fromDate || toDate) && (
+          <Button variant="ghost" size="sm" className="mt-2" onClick={() => { setFilterType("todos"); setFilterCat("todas"); setFromDate(""); setToDate(""); }}>Limpar filtros</Button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
         <div className="mt-6">
           <EmptyState
             icon={Wallet}
-            title="Nenhum lançamento ainda"
-            description="Cadastre seu primeiro ganho ou gasto."
-            action={<Button onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" /> Novo lançamento</Button>}
+            title={entries.length === 0 ? "Nenhum lançamento ainda" : "Nada bate com os filtros"}
+            description={entries.length === 0 ? "Cadastre seu primeiro ganho ou gasto." : "Ajuste os filtros para ver mais resultados."}
+            action={entries.length === 0 ? <Button onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" /> Novo lançamento</Button> : undefined}
           />
         </div>
       ) : (
@@ -128,16 +184,18 @@ function Financas() {
                 <tr><th className="px-4 py-3">Data</th><th className="px-4 py-3">Descrição</th><th className="px-4 py-3">Categoria</th><th className="px-4 py-3 text-right">Valor</th><th /></tr>
               </thead>
               <tbody>
-                {entries.map((e) => (
+                {filtered.map((e) => (
                   <tr key={e.id} className="border-b border-border/50 last:border-0">
-                    <td className="px-4 py-3 text-muted-foreground">{e.entry_date}</td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{e.entry_date}</td>
                     <td className="px-4 py-3">{e.description ?? "—"}</td>
                     <td className="px-4 py-3 text-muted-foreground">{e.category ?? "—"}</td>
-                    <td className={`px-4 py-3 text-right font-medium ${e.type === "ganho" ? "text-success" : "text-destructive"}`}>
+                    <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${e.type === "ganho" ? "text-success" : "text-destructive"}`}>
                       {e.type === "ganho" ? "+" : "−"} {formatBRL(Number(e.amount))}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => remove.mutate(e.id)} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => setConfirmDel(e)} className="rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label="Remover">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -146,6 +204,23 @@ function Financas() {
           </div>
         </>
       )}
+
+      <AlertDialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover lançamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDel && (
+                <>Você vai remover <strong>{confirmDel.description ?? confirmDel.category ?? "este lançamento"}</strong> ({formatBRL(Number(confirmDel.amount))}) de {confirmDel.entry_date}. Essa ação não pode ser desfeita.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmDel && remove.mutate(confirmDel.id)} className="bg-destructive hover:bg-destructive/90">Remover</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

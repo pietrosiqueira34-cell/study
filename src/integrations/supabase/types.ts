@@ -357,6 +357,7 @@ export type Database = {
           created_at: string
           exercise: string
           id: string
+          muscle_group: string | null
           notes: string | null
           position: number | null
           reps: number | null
@@ -371,6 +372,7 @@ export type Database = {
           created_at?: string
           exercise: string
           id?: string
+          muscle_group?: string | null
           notes?: string | null
           position?: number | null
           reps?: number | null
@@ -385,6 +387,7 @@ export type Database = {
           created_at?: string
           exercise?: string
           id?: string
+          muscle_group?: string | null
           notes?: string | null
           position?: number | null
           reps?: number | null
@@ -409,6 +412,7 @@ export type Database = {
           completed: boolean
           created_at: string
           duration_minutes: number | null
+          duration_seconds: number | null
           id: string
           muscle_group: string | null
           name: string
@@ -416,11 +420,13 @@ export type Database = {
           updated_at: string
           user_id: string
           workout_date: string
+          workout_type: string
         }
         Insert: {
           completed?: boolean
           created_at?: string
           duration_minutes?: number | null
+          duration_seconds?: number | null
           id?: string
           muscle_group?: string | null
           name: string
@@ -428,11 +434,13 @@ export type Database = {
           updated_at?: string
           user_id: string
           workout_date?: string
+          workout_type?: string
         }
         Update: {
           completed?: boolean
           created_at?: string
           duration_minutes?: number | null
+          duration_seconds?: number | null
           id?: string
           muscle_group?: string | null
           name?: string
@@ -440,6 +448,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           workout_date?: string
+          workout_type?: string
         }
         Relationships: []
       }

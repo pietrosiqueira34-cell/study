@@ -1,9 +1,13 @@
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+// Client-side PDF text extraction using pdfjs-dist.
+// Worker carregado via CDN (mesma versão da lib) — evita problemas de bundling
+// (DOMMatrix indefinido, worker não encontrado, etc).
+import * as pdfjs from "pdfjs-dist";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/legacy/build/pdf.worker.js",
-  import.meta.url
-).toString();
+const PDFJS_VERSION = (pdfjs as unknown as { version?: string }).version ?? "4.10.38";
+
+if (typeof window !== "undefined") {
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+}
 
 export async function extractPdfText(file: File | Blob): Promise<{ text: string; pages: number }> {
   const buf = await file.arrayBuffer();

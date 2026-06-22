@@ -1,17 +1,16 @@
-// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
-// or the app will break with duplicate plugins:
-//   - tanstackStart, viteReact, tailwindcss, tsConfigPaths, nitro (build-only using cloudflare as a default target),
-//     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
-//     error logger plugins, and sandbox detection (port/host/strictPort).
-// You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
+// @lovable.dev/vite-tanstack-config already includes tanstackStart, viteReact, tailwindcss,
+// tsConfigPaths, nitro (cloudflare default), componentTagger (dev), env injection, etc.
+// Para build estático Netlify Drop, rode com:  NITRO_PRESET=netlify-static npm run build:static
+// (ou apenas npm run build:static — o script já injeta a env).
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
-import netlifyPlugin from "@netlify/vite-plugin-tanstack-start";
+
 export default defineConfig({
   tanstackStart: {
-    server: { entry: "server" },
-  },
-  vite: {
-    plugins: [netlifyPlugin()],
+    server: {
+      entry: "server",
+      // Permite trocar o preset do nitro via env (cloudflare por padrão no preview Lovable;
+      // netlify-static no build do Netlify Drop).
+      preset: process.env.NITRO_PRESET as never,
+    },
   },
 });

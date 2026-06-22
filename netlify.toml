@@ -1,7 +1,19 @@
 [build]
-  command = "npm run build"
-  publish = "dist/client"
+  command = "npm run build:static"
+  publish = "dist"
+  functions = "netlify/functions"
 
+[functions]
+  node_bundler = "esbuild"
+
+# Roteia /api/chat para a função serverless (UI usa sempre /api/chat)
+[[redirects]]
+  from = "/api/chat"
+  to = "/.netlify/functions/ai"
+  status = 200
+  force = true
+
+# SPA fallback — qualquer rota não-existente cai no index.html (React Router/TanStack lida)
 [[redirects]]
   from = "/*"
   to = "/index.html"
